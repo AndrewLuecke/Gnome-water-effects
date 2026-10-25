@@ -1,0 +1,8 @@
+{
+  "uuid": "water-effects@andrewluecke.github.io",
+  "name": "Water Effects",
+  "description": "Ripples and Waves along the bottom of the desktop, after the Enlightenment 16 effects.",
+  "shell-version": ["50"],
+  "settings-schema": "org.gnome.shell.extensions.water-effects",
+  "url": "https://github.com/AndrewLuecke/Gnome-water-effects"
+}

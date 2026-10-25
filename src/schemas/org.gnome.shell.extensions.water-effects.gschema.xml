@@ -1,0 +1,39 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<schemalist>
+  <schema id="org.gnome.shell.extensions.water-effects"
+          path="/org/gnome/shell/extensions/water-effects/">
+    <key name="effect" type="s">
+      <choices>
+        <choice value="ripples"/>
+        <choice value="waves"/>
+      </choices>
+      <default>'ripples'</default>
+      <summary>Water effect</summary>
+      <description>“ripples” draws a rippling reflection of the desktop along the bottom of the screen. “waves” causes the ripples to move like a wave.</description>
+    </key>
+    <key name="water-height" type="i">
+      <range min="16" max="400"/>
+      <default>128</default>
+      <summary>Depth of the water in pixels</summary>
+    </key>
+    <key name="amplitude" type="d">
+      <range min="0" max="3"/>
+      <default>1.0</default>
+      <summary>Strength of the ripples</summary>
+    </key>
+    <key name="speed" type="d">
+      <range min="0.1" max="4"/>
+      <default>1.0</default>
+      <summary>Speed of the ripples</summary>
+    </key>
+    <key name="above-panels" type="b">
+      <default>true</default>
+      <summary>Keep the water above panels and docks at the bottom of the screen</summary>
+    </key>
+    <key name="frame-rate" type="i">
+      <range min="5" max="120"/>
+      <default>15</default>
+      <summary>Maximum frames per second for the animation</summary>
+    </key>
+  </schema>
+</schemalist>
