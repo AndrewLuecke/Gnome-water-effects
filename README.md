@@ -2,10 +2,11 @@
 
 A GNOME Shell extension that brings back the old desktop effects from Enlightenment 16.
 
-- **Ripples** causes water in the background to ripple. 
-- **Waves** Same as ripples but also moves like waves
+**Ripples** causes water in the background to ripple. 
+![Ripples](./images/ripples1.png)
 
-![Image of Background](./images/ripples.png)
+**Waves** Same as ripples but also moves like waves
+![Waves](./images/waves1.png)
 
 ## Install
 
