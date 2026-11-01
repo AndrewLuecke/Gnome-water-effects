@@ -13,7 +13,7 @@
     </key>
     <key name="water-height" type="i">
       <range min="16" max="400"/>
-      <default>128</default>
+      <default>64</default>
       <summary>Depth of the water in pixels</summary>
     </key>
     <key name="amplitude" type="d">

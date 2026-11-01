@@ -8,22 +8,41 @@ import * as Main from 'resource:///org/gnome/shell/ui/main.js';
 
 import {WaterLayer} from './waterLayer.js';
 
-// E16 advanced its phases by these amounts on every 66 ms tick
+// Draws E16's water along the bottom of each monitor.
+//
+// The extension puts one WaterLayer per monitor in a group just above the
+// windows. Each layer holds a flipped copy of the desktop, and its WaterEffect
+// shader turns that copy into a rippling reflection. A timer advances the
+// ripples at the frame rate from the settings, and before every frame the
+// layers learn where the windows are, so the water stays behind them.
+//
+//   extension.js   settings, signals and the animation timer
+//   waterLayer.js  one monitor's water: the flipped copies and their geometry
+//   waterEffect.js the shader that draws the ripples
+
+// E16 advanced its phases by these amounts on every 66 ms tick. The three
+// phases are incv and inch, which move the ripples up and down and side to
+// side, and incx, which rolls the swell. Here they are in radians per second.
 const E16_TICK = 0.066;
 const PHASE_RATES = [0.40 / E16_TICK, 0.32 / E16_TICK, 0.32 / E16_TICK];
 
 // How far the waves swell, and how far the ripples and swell together move
-// the reflection, in pixels for a 64 px band
+// the reflection, in pixels for a 64 px band. These match the 10.0 and 7.0
+// in the shader.
 const SWELL = 10;
 const REACH = 7 + SWELL;
 
 // Longest step the animation takes, so it doesn't lurch after a stall
 const MAX_STEP = 0.25; // s
 
+// How often the timer checks whether windows cover the water, since no signal
+// says when a window is moved over it
 const COVER_CHECK_INTERVAL = 500 * 1000; // µs
 
 export default class WaterEffectsExtension extends Extension {
     enable() {
+        // The ripples' phases, shared by every layer so the water lines up
+        // across monitors
         this._settings = this.getSettings();
         this._phases = [0, 0, 0];
         this._layers = [];
@@ -34,6 +53,10 @@ export default class WaterEffectsExtension extends Extension {
         this._visibleBinding = global.window_group.bind_property('visible',
             this._group, 'visible', GObject.BindingFlags.SYNC_CREATE);
 
+        // New monitors need new layers. Panels, fullscreen windows and
+        // settings move or hide the water. Windows opening, closing and
+        // restacking need their copies kept in step, and the holes follow the
+        // windows on every frame.
         Main.uiGroup.connectObject('child-added', () => this._keepAboveWindows(), this);
         Main.layoutManager.connectObject('monitors-changed', () => this._createLayers(), this);
         global.display.connectObject(
@@ -79,6 +102,7 @@ export default class WaterEffectsExtension extends Extension {
             Main.uiGroup.set_child_above_sibling(this._group, global.window_group);
     }
 
+    // Starts over with one layer per monitor
     _createLayers() {
         this._group.destroy_all_children();
         this._layers = Main.layoutManager.monitors.map(monitor => {
@@ -91,10 +115,15 @@ export default class WaterEffectsExtension extends Extension {
         this._syncWindows();
     }
 
+    // Places each layer and passes it the settings
     _updateLayers() {
         const depth = this._settings.get_int('water-height');
         const amplitude = this._settings.get_double('amplitude');
         const waves = this._settings.get_string('effect') === 'waves';
+        // E16's movements were for 64 px of water, so they grow with the
+        // depth as well as the strength. The layer starts a margin above the
+        // water line and ends a margin below the screen, giving the ripples
+        // room to read past both. The extra 2 px covers rounding.
         const scale = amplitude * depth / 64;
         const swell = waves ? Math.ceil(SWELL * scale) : 0;
         const margin = Math.ceil(REACH * scale) + 2;
@@ -102,6 +131,8 @@ export default class WaterEffectsExtension extends Extension {
         for (const layer of this._layers) {
             const monitor = Main.layoutManager.monitors[layer.monitorIndex];
 
+            // The water sits on the bottom of the monitor, or on top of the
+            // panels and docks there
             let bottom = monitor.y + monitor.height;
             if (this._settings.get_boolean('above-panels')) {
                 const workArea = Main.layoutManager.getWorkAreaForMonitor(layer.monitorIndex);
@@ -116,6 +147,7 @@ export default class WaterEffectsExtension extends Extension {
         this._checkCovered();
     }
 
+    // Gives each layer a copy of every window, in the same stacking order
     _syncWindows() {
         const windowActors = global.get_window_actors();
         for (const layer of this._layers)
@@ -128,6 +160,8 @@ export default class WaterEffectsExtension extends Extension {
         if (!this._group.mapped)
             return;
 
+        // Desktop windows, such as desktop icons, are part of the background
+        // the water lies on, so they don't cut holes in it
         const windows = global.get_window_actors()
             .filter(actor => actor.is_mapped() && actor.opacity > 0 &&
                 actor.meta_window.get_window_type() !== Meta.WindowType.DESKTOP)
@@ -139,6 +173,8 @@ export default class WaterEffectsExtension extends Extension {
         }
     }
 
+    // Restarted whenever the settings change, to pick up a new frame rate or
+    // speed
     _startTimer() {
         this._stopTimer();
 
@@ -157,6 +193,8 @@ export default class WaterEffectsExtension extends Extension {
         this._timeoutId = 0;
     }
 
+    // Advances the phases by the time since the last tick rather than by a
+    // fixed step, so the water moves at the same speed at any frame rate
     _tick() {
         const now = GLib.get_monotonic_time();
         const step = Math.min((now - this._lastTime) / GLib.USEC_PER_SEC, MAX_STEP);
@@ -188,6 +226,12 @@ export default class WaterEffectsExtension extends Extension {
             layer.visible = !this._isCovered(layer.monitorIndex, layer.band);
     }
 
+    /**
+     * @param {number} monitorIndex - the layer's monitor
+     * @param {object|null} band - stage rect of the water, or null before the
+     *   layer is placed
+     * @returns {boolean} whether nothing of the water can be seen
+     */
     _isCovered(monitorIndex, band) {
         if (!band)
             return true;
@@ -195,6 +239,8 @@ export default class WaterEffectsExtension extends Extension {
         if (global.display.get_monitor_in_fullscreen(monitorIndex))
             return true;
 
+        // Only an opaque window on this workspace that spans the whole band
+        // hides it
         const workspace = global.workspace_manager.get_active_workspace();
         return global.get_window_actors().some(windowActor => {
             const window = windowActor.meta_window;

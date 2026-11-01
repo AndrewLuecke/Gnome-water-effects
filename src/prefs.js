@@ -72,6 +72,8 @@ export default class WaterEffectsPreferences extends ExtensionPreferences {
         }));
     }
 
+    // A spin row bound to a settings key, limited to the key's range in the
+    // schema. get_range() gives ('range', (min, max)).
     _spinRow(settings, key, {title, subtitle, step, digits = 0}) {
         const [, [min, max]] = settings.settings_schema.get_key(key).get_range().recursiveUnpack();
         const row = new Adw.SpinRow({
